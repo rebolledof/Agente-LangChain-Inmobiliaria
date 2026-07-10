@@ -33,18 +33,15 @@ WORKSHEET_NAME = os.getenv("GOOGLE_SHEETS_WORKSHEET", "")  # vacío = primera ho
 
 if not SPREADSHEET_ID:
     raise ValueError(
-        "❌ Falta GOOGLE_SHEETS_SPREADSHEET_ID en .env
-"
+        "\u274c Falta GOOGLE_SHEETS_SPREADSHEET_ID en .env\n"
         "Es el ID del Google Sheet (la parte entre /d/ y /edit de la URL)."
     )
 
 if not SERVICE_ACCOUNT_KEY:
     raise ValueError(
-        "❌ Falta GOOGLE_SHEETS_SERVICE_ACCOUNT_KEY en .env
-"
-        "Debe contener el JSON completo del service account como string. Ejemplo:
-"
-        "GOOGLE_SHEETS_SERVICE_ACCOUNT_KEY='{	ype\:\service_account\,...}'"
+        "\u274c Falta GOOGLE_SHEETS_SERVICE_ACCOUNT_KEY en .env\n"
+        'Debe contener el JSON completo del service account como string.\n'
+        'Ejemplo: GOOGLE_SHEETS_SERVICE_ACCOUNT_KEY=\'{"type":"service_account",...}\''
     )
 
 # Validar que el JSON sea parseable en tiempo de importación (falla rápido)
@@ -52,8 +49,7 @@ try:
     _credentials_dict = json.loads(SERVICE_ACCOUNT_KEY)
 except json.JSONDecodeError as e:
     raise ValueError(
-        f"❌ GOOGLE_SHEETS_SERVICE_ACCOUNT_KEY no es un JSON válido: {e}
-"
+        f"\u274c GOOGLE_SHEETS_SERVICE_ACCOUNT_KEY no es un JSON válido: {e}\n"
         "Asegurate de que el valor sea el contenido completo del archivo .json del service account."
     )
 
@@ -83,12 +79,6 @@ def _leer_departamentos_interno(filtro: str = "") -> str:
     """
     Lee todas las filas del Google Sheet y las formatea como texto.
     La fila 1 se usa como cabecera (nombres de columna).
-
-    Args:
-        filtro: Texto opcional para filtrar filas (coincidencia en cualquier columna)
-
-    Returns:
-        str: Departamentos encontrados formateados, o mensaje de error
     """
     try:
         worksheet = _get_worksheet()
@@ -109,18 +99,13 @@ def _leer_departamentos_interno(filtro: str = "") -> str:
                     "Puedes pedir la lista completa sin filtro."
                 )
 
-        respuesta = f"Departamentos disponibles para alquilar ({len(registros)}):
-
-"
+        respuesta = f"Departamentos disponibles para alquilar ({len(registros)}):\n\n"
         for i, registro in enumerate(registros, 1):
-            respuesta += f"[{i}]
-"
+            respuesta += f"[{i}]\n"
             for columna, valor in registro.items():
                 if str(valor).strip():
-                    respuesta += f"- {columna}: {valor}
-"
-            respuesta += "
-"
+                    respuesta += f"- {columna}: {valor}\n"
+            respuesta += "\n"
 
         return respuesta
 
@@ -148,5 +133,6 @@ def buscar_departamentos_alquiler(filtro: str = "") -> str:
         filtro: Texto opcional para filtrar (ej. distrito, precio, "2 habitaciones").
                 Si está vacío, devuelve todos los departamentos disponibles.
     """
-    print(f"   🏢 Consultando departamentos en alquiler (filtro: '{filtro or "todos"}')")
+    filtro_label = filtro if filtro else "todos"
+    print(f"   \U0001f3e2 Consultando departamentos en alquiler (filtro: '{filtro_label}')")
     return _leer_departamentos_interno(filtro)
