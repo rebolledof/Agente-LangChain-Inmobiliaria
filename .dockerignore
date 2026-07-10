@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+credentials/*.json
+__pycache__/
+*.py[cod]
+*.pyo
+.DS_Store
+.git/
+.gitignore
+.venv/
+venv/
+*.log
+.vscode/
+.idea/
+.claude/
