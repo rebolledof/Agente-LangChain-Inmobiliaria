@@ -29,4 +29,5 @@ RUN mkdir -p /app/credentials
 
 EXPOSE 8000
 
-CMD [uvicorn, main_chatwoot:app, --host, 0.0.0.0, --port, 8000]
+# CMD [uvicorn, main_chatwoot:app, --host, 0.0.0.0, --port, 8000]
+CMD ["uvicorn", "main_chatwoot:app", "--host", "0.0.0.0", "--port", "8000"]
