@@ -2,7 +2,10 @@
 Tool: Consulta de pagos mensuales de inquilinos (Google Sheets)
 Lee la hoja de pagos del edificio. Cada worksheet es un mes (ej. "Abril").
 Autentica al inquilino por ID + nombre + bloque antes de mostrar sus datos.
-Usa la misma clave de servicio que la tool de departamentos en alquiler.
+
+El sheet puede tener filas de cabecera agrupadas (celdas fusionadas).
+Usamos get_all_values() y detectamos la fila de cabecera real buscando la
+columna "ID" — evitando el error de duplicados de get_all_records().
 
 Autor: DataPath / Alpha State
 """
@@ -48,7 +51,7 @@ MESES_ES = [
     "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
 ]
 
-# Columnas que identifican al inquilino (no se muestran como pagos)
+# Columnas de identificación — no se muestran como pagos
 _COLS_IDENTIDAD = {"bloque inmobiliario", "id", "responsable de pago / propietario"}
 
 _client = None
@@ -65,11 +68,47 @@ def _mes_actual() -> str:
     return MESES_ES[datetime.now().month - 1]
 
 
+def _parse_worksheet(worksheet) -> tuple[list[str], list[dict]]:
+    """
+    Parsea un worksheet que puede tener filas de grupo (celdas fusionadas)
+    antes de la fila de cabecera real.
+
+    Estrategia: busca la primera fila que contenga "ID" como valor de celda —
+    esa es la cabecera real. Las filas anteriores son cabeceras de grupo y se
+    descartan. Las filas siguientes son datos.
+
+    Returns:
+        (headers, records) donde records es list[dict] con headers como claves.
+    """
+    all_rows = worksheet.get_all_values()
+
+    header_idx = None
+    for i, row in enumerate(all_rows):
+        # Normalizar: strip + lower para buscar "id"
+        if any(cell.strip().upper() == "ID" for cell in row):
+            header_idx = i
+            break
+
+    if header_idx is None:
+        return [], []
+
+    headers = [cell.strip() for cell in all_rows[header_idx]]
+    records = []
+    for row in all_rows[header_idx + 1:]:
+        # Saltar filas completamente vacías
+        if not any(cell.strip() for cell in row):
+            continue
+        # Rellenar si la fila tiene menos celdas que la cabecera
+        padded = row + [""] * (len(headers) - len(row))
+        records.append(dict(zip(headers, padded)))
+
+    return headers, records
+
+
 def _consultar_pagos(id_inquilino: str, nombre: str, bloque: str, mes: str) -> str:
     try:
         spreadsheet = _get_client().open_by_key(SPREADSHEET_ID)
 
-        # Verificar si el worksheet del mes existe
         worksheets_disponibles = [ws.title for ws in spreadsheet.worksheets()]
         mes_capitalizado = mes.strip().capitalize()
 
@@ -78,12 +117,11 @@ def _consultar_pagos(id_inquilino: str, nombre: str, bloque: str, mes: str) -> s
             return f"MES_NO_DISPONIBLE: {mes_capitalizado}. Meses disponibles: {meses_str}"
 
         worksheet = spreadsheet.worksheet(mes_capitalizado)
-        registros = worksheet.get_all_records()
+        headers, registros = _parse_worksheet(worksheet)
 
         if not registros:
             return f"No hay datos registrados para el mes de {mes_capitalizado}."
 
-        # Buscar la fila que matchea los 3 campos (ID exacto, nombre y bloque case-insensitive)
         id_buscado = str(id_inquilino).strip()
         nombre_buscado = nombre.strip().lower()
         bloque_buscado = str(bloque).strip().lower()
@@ -101,7 +139,6 @@ def _consultar_pagos(id_inquilino: str, nombre: str, bloque: str, mes: str) -> s
         if fila_encontrada is None:
             return "No encontre registros con esos datos. Verifica tu ID, nombre completo y numero de bloque."
 
-        # Formatear solo las columnas de pagos (excluir columnas de identidad)
         nombre_real = fila_encontrada.get("Responsable de Pago / Propietario", nombre)
         bloque_real = fila_encontrada.get("Bloque inmobiliario", bloque)
 
@@ -109,7 +146,7 @@ def _consultar_pagos(id_inquilino: str, nombre: str, bloque: str, mes: str) -> s
         for columna, valor in fila_encontrada.items():
             if columna.strip().lower() in _COLS_IDENTIDAD:
                 continue
-            if str(valor).strip() and str(valor).strip() != "0":
+            if str(valor).strip() and str(valor).strip() not in ("0", "0.0"):
                 respuesta += f"  {columna}: {valor}\n"
 
         return respuesta
@@ -144,7 +181,7 @@ def consultar_pagos_inquilino(
         id_inquilino: ID numerico del inquilino (columna ID en la planilla).
         nombre: Nombre completo del responsable de pago tal como figura en la planilla.
         bloque: Numero de bloque/departamento (ej. "101", "205").
-        mes: Mes a consultar en espanol con mayuscula inicial (ej. "Abril", "Julio").
+        mes: Mes a consultar con mayuscula inicial (ej. "Abril", "Julio").
              Si esta vacio, se usa el mes actual.
     """
     mes_consulta = mes.strip() if mes.strip() else _mes_actual()
