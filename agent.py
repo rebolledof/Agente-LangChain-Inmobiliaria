@@ -149,6 +149,7 @@ def chat_con_agente(mensaje_usuario: str, session_id: str) -> str:
                 if t.name == tool_name:
                     result = t.invoke(tool_args)
                     print(f"      ✔ {tool_name} devolvió {len(str(result))} caracteres")
+                    print(f"         Resultado: {result}")
                     tool_results.append({
                         "tool_call_id": tool_call["id"],
                         "result": result

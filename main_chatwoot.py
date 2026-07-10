@@ -119,7 +119,7 @@ def conversation_id_to_uuid(conversation_id: int) -> str:
 app = FastAPI(
     title="DataBot - Agente IA con Chatwoot",
     description="Webhook para integrar el Agente D con Chatwoot",
-    version="1.0.0"
+    version="2.0.0"
 )
 
 
@@ -214,7 +214,7 @@ def read_root():
     """Endpoint raíz con información del servicio."""
     return {
         "service": "DataBot - Agente IA",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "agent": "Agente D (RAG + Internet + Memoria)",
         "model": "GPT-4.1",
         "tools": ["buscar_datapath", "buscar_internet", "obtener_fecha_hora"],
