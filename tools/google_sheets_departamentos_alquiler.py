@@ -1,16 +1,20 @@
 """
 Tool: Departamentos disponibles para alquilar (Google Sheets)
 Lee la hoja de cálculo de departamentos en alquiler usando un Service Account
-de Google Cloud (clave JSON). Solo lectura (scope readonly).
+de Google Cloud. Las credenciales se leen desde la variable de entorno
+GOOGLE_SHEETS_SERVICE_ACCOUNT_KEY (JSON completo como string), lo que permite
+despliegue en plataformas como Easypanel sin montar archivos de credenciales.
 
 Requisitos previos:
 1. Crear un Service Account en Google Cloud y descargar su clave JSON.
 2. Habilitar la API "Google Sheets API" en el proyecto de Google Cloud.
 3. Compartir el Google Sheet con el email del service account (permiso Lector).
+4. Copiar el contenido del JSON y pegarlo como valor de GOOGLE_SHEETS_SERVICE_ACCOUNT_KEY.
 
 Autor: Ing. Kevin Inofuente Colque - DataPath
 """
 
+import json
 import os
 
 from dotenv import load_dotenv, find_dotenv
@@ -20,39 +24,43 @@ import gspread
 
 load_dotenv(find_dotenv())
 
-# Raíz del proyecto (este archivo vive en tools/)
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
 # ============================================
 # CONFIGURACIÓN DE GOOGLE SHEETS
 # ============================================
 SPREADSHEET_ID = os.getenv("GOOGLE_SHEETS_SPREADSHEET_ID")
-CREDENTIALS_FILE = os.getenv(
-    "GOOGLE_SHEETS_CREDENTIALS_FILE", "credentials/google-service-account.json"
-)
+SERVICE_ACCOUNT_KEY = os.getenv("GOOGLE_SHEETS_SERVICE_ACCOUNT_KEY")
 WORKSHEET_NAME = os.getenv("GOOGLE_SHEETS_WORKSHEET", "")  # vacío = primera hoja
-
-# Ruta de la clave JSON resuelta contra la raíz del proyecto (portable)
-if not os.path.isabs(CREDENTIALS_FILE):
-    CREDENTIALS_FILE = os.path.join(BASE_DIR, CREDENTIALS_FILE)
 
 if not SPREADSHEET_ID:
     raise ValueError(
-        "❌ Falta GOOGLE_SHEETS_SPREADSHEET_ID en .env\n"
+        "❌ Falta GOOGLE_SHEETS_SPREADSHEET_ID en .env
+"
         "Es el ID del Google Sheet (la parte entre /d/ y /edit de la URL)."
     )
 
-if not os.path.exists(CREDENTIALS_FILE):
+if not SERVICE_ACCOUNT_KEY:
     raise ValueError(
-        f"❌ No se encontró la clave JSON del service account: {CREDENTIALS_FILE}\n"
-        "Descárgala desde Google Cloud (IAM > Service Accounts > Keys) y define\n"
-        "GOOGLE_SHEETS_CREDENTIALS_FILE en .env (ruta relativa al proyecto o absoluta)."
+        "❌ Falta GOOGLE_SHEETS_SERVICE_ACCOUNT_KEY en .env
+"
+        "Debe contener el JSON completo del service account como string. Ejemplo:
+"
+        "GOOGLE_SHEETS_SERVICE_ACCOUNT_KEY='{	ype\:\service_account\,...}'"
+    )
+
+# Validar que el JSON sea parseable en tiempo de importación (falla rápido)
+try:
+    _credentials_dict = json.loads(SERVICE_ACCOUNT_KEY)
+except json.JSONDecodeError as e:
+    raise ValueError(
+        f"❌ GOOGLE_SHEETS_SERVICE_ACCOUNT_KEY no es un JSON válido: {e}
+"
+        "Asegurate de que el valor sea el contenido completo del archivo .json del service account."
     )
 
 # Solo lectura: el agente nunca modifica la hoja
 _SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
 
-# Cliente perezoso: la clave se valida al importar, pero la conexión
+# Cliente perezoso: las credenciales se validan al importar, pero la conexión
 # a Google se abre recién en la primera consulta.
 _client = None
 
@@ -61,7 +69,7 @@ def _get_worksheet():
     """Devuelve la hoja de trabajo configurada (autentica en la primera llamada)."""
     global _client
     if _client is None:
-        _client = gspread.service_account(filename=CREDENTIALS_FILE, scopes=_SCOPES)
+        _client = gspread.service_account_from_dict(_credentials_dict, scopes=_SCOPES)
     spreadsheet = _client.open_by_key(SPREADSHEET_ID)
     if WORKSHEET_NAME:
         return spreadsheet.worksheet(WORKSHEET_NAME)
@@ -101,13 +109,18 @@ def _leer_departamentos_interno(filtro: str = "") -> str:
                     "Puedes pedir la lista completa sin filtro."
                 )
 
-        respuesta = f"Departamentos disponibles para alquilar ({len(registros)}):\n\n"
+        respuesta = f"Departamentos disponibles para alquilar ({len(registros)}):
+
+"
         for i, registro in enumerate(registros, 1):
-            respuesta += f"[{i}]\n"
+            respuesta += f"[{i}]
+"
             for columna, valor in registro.items():
                 if str(valor).strip():
-                    respuesta += f"- {columna}: {valor}\n"
-            respuesta += "\n"
+                    respuesta += f"- {columna}: {valor}
+"
+            respuesta += "
+"
 
         return respuesta
 
@@ -135,5 +148,5 @@ def buscar_departamentos_alquiler(filtro: str = "") -> str:
         filtro: Texto opcional para filtrar (ej. distrito, precio, "2 habitaciones").
                 Si está vacío, devuelve todos los departamentos disponibles.
     """
-    print(f"   🏢 Consultando departamentos en alquiler (filtro: '{filtro or 'todos'}')")
+    print(f"   🏢 Consultando departamentos en alquiler (filtro: '{filtro or "todos"}')")
     return _leer_departamentos_interno(filtro)
